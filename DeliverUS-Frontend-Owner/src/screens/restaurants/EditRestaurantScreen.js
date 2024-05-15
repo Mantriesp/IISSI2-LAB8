@@ -4,7 +4,7 @@ import * as ExpoImagePicker from 'expo-image-picker'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as yup from 'yup'
 import DropDownPicker from 'react-native-dropdown-picker'
-import { getRestaurantCategories, getDetail } from '../../api/RestaurantEndpoints'
+import { getRestaurantCategories, getDetail, update } from '../../api/RestaurantEndpoints'
 import InputItem from '../../components/InputItem'
 import TextRegular from '../../components/TextRegular'
 import * as GlobalStyles from '../../styles/GlobalStyles'
@@ -20,6 +20,45 @@ export default function EditRestaurantScreen ({ navigation, route }) {
   const [open, setOpen] = useState(false)
   const [restaurantCategories, setRestaurantCategories] = useState([])
   const [backendErrors, setBackendErrors] = useState()
+  const [restaurant, setRestaurant] = useState({})
+  const [initialRestaurantValues, setInitialRestaurantValues] = useState({ name: null, description: null, address: null, postalCode: null, url: null, shippingCosts: null, email: null, phone: null, restaurantCategoryId: null, logo: null, heroImage: null })
+
+  useEffect(() => {
+    async function fetchRestaurantDetail () {
+      try {
+        const fetchedRestaurant = await getDetail(route.params.id)
+        const preparedRestaurant = prepareEntityImages(fetchedRestaurant, ['logo', 'heroImage'])
+        setRestaurant(preparedRestaurant)
+        const initialValues = buildInitialValues(preparedRestaurant, initialRestaurantValues)
+        setInitialRestaurantValues(initialValues)
+      } catch (error) {
+        showMessage({
+          message: `There was an error while retrieving restaurant details (id ${route.params.id}). ${error}`,
+          type: 'error',
+          style: GlobalStyles.flashStyle,
+          titleStyle: GlobalStyles.flashTextStyle
+        })
+      }
+    }
+    fetchRestaurantDetail()
+  }, [route])
+
+  const updateRestaurant = async (values) => {
+    setBackendErrors([])
+    try {
+      const updatedRestaurant = await update(restaurant.id, values)
+      showMessage({
+        message: `Restaurant ${updatedRestaurant.name} succesfully updated`,
+        type: 'success',
+        style: GlobalStyles.flashStyle,
+        titleStyle: GlobalStyles.flashTextStyle
+      })
+      navigation.navigate('RestaurantsScreen', { dirty: true })
+    } catch (error) {
+      console.log(error)
+      setBackendErrors(error.errors)
+    }
+  }
 
   const validationSchema = yup.object().shape({
     name: yup
@@ -108,8 +147,10 @@ export default function EditRestaurantScreen ({ navigation, route }) {
   return (
     <Formik
       validationSchema={validationSchema}
-      // include the formik properties here
-      >
+      enableReinitialize
+      initialValues={initialRestaurantValues}
+      onSubmit={updateRestaurant}
+    >
       {({ handleSubmit, setFieldValue, values }) => (
         <ScrollView>
           <View style={{ alignItems: 'center' }}>
@@ -152,7 +193,7 @@ export default function EditRestaurantScreen ({ navigation, route }) {
                 value={values.restaurantCategoryId}
                 items={restaurantCategories}
                 setOpen={setOpen}
-                onSelectItem={ item => {
+                onSelectItem={item => {
                   setFieldValue('restaurantCategoryId', item.value)
                 }}
                 setItems={setRestaurantCategories}
@@ -161,7 +202,7 @@ export default function EditRestaurantScreen ({ navigation, route }) {
                 style={{ backgroundColor: GlobalStyles.brandBackground }}
                 dropDownStyle={{ backgroundColor: '#fafafa' }}
               />
-              <ErrorMessage name={'restaurantCategoryId'} render={msg => <TextError>{msg}</TextError> }/>
+              <ErrorMessage name={'restaurantCategoryId'} render={msg => <TextError>{msg}</TextError>} />
 
               <Pressable onPress={() =>
                 pickImage(
@@ -204,7 +245,7 @@ export default function EditRestaurantScreen ({ navigation, route }) {
                   styles.button
                 ]}>
                 <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
-                  <MaterialCommunityIcons name='content-save' color={'white'} size={20}/>
+                  <MaterialCommunityIcons name='content-save' color={'white'} size={20} />
                   <TextRegular textStyle={styles.text}>
                     Save
                   </TextRegular>
